@@ -22,8 +22,8 @@ class HTFERL_Layer(object):
     """A layer in a HTFERL hierarchy"""
 
     def __init__(self,
-                 inputSize = (16, 16),
-                 layerSize = (16, 16),
+                 inputSize = (8, 8),
+                 layerSize = (8, 8),
                  feedForwardRadius = 2, lateralRadius = 2, feedBackRadius = 2, inhibitionRadius = 2, 
                  sparsity = 0.125,
                  minInitWeight = -0.1, maxInitWeight = 0.1):
@@ -194,7 +194,7 @@ class HTFERL_Layer(object):
                                              (vCenter[0] + self.feedForwardRadius + 1, vCenter[1] + self.feedForwardRadius + 1))
 
 
-                self.hiddenErrors[x][y] = np.dot(self.feedForwardWeights[index].T, subReconstructionError)
+                self.hiddenErrors[x][y] = np.dot(self.feedForwardWeights[index].T, subReconstructionError) * self.hiddenActivations[x][y] * (1.0 - self.hiddenActivations[x][y])
 
                 # Update feed forward weights
                 self.feedForwardWeights[index] += alpha * 0.5 * (self.hiddenFeedBackStates[x][y] * subReconstructionError + self.hiddenErrors[x][y] * subFeedForward)

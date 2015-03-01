@@ -4,8 +4,8 @@ import numpy as np
 class HTFERL_LayerParams(object):
     """Container for parameters for initializing HTFERL layers"""
 
-    inputSize = (16, 16)
-    layerSize = (16, 16)
+    inputSize = (8, 8)
+    layerSize = (8, 8)
     feedForwardRadius = 2
     lateralRadius = 2
     feedBackRadius = 2
