@@ -45,6 +45,7 @@ class HTFERL_Layer(object):
         self.hiddenSums = np.zeros(layerSize)
         self.hiddenActivations = np.zeros(layerSize)
         self.hiddenFeedForwardStates = np.zeros(layerSize)
+        self.hiddenFeedForwardStatesPrev = np.zeros(layerSize)
         self.hiddenFeedBackStates = np.zeros(layerSize)
         self.hiddenBiases = np.random.rand(layerSize[0], layerSize[1]) * (maxInitWeight - minInitWeight) + minInitWeight
         self.hiddenDutyCycles = np.full(layerSize, sparsity)
@@ -64,6 +65,9 @@ class HTFERL_Layer(object):
     def setVisibleState(self, position, state):
         self.visibleStates[position] = state
 
+    def getVisibleReconstruction(self, position):
+        return self.visibleReconstruction[position]
+
     def getHiddenState(self, position):
         return self.hiddenFeedForwardStates[position]
 
@@ -80,7 +84,7 @@ class HTFERL_Layer(object):
                                              (vCenter[0] + self.feedForwardRadius + 1, vCenter[1] + self.feedForwardRadius + 1))
 
                 # TODO: Decide whether to move this to feedback phase instead?
-                subFeedLateral = getSubarray(self.hiddenFeedForwardStates,
+                subFeedLateral = getSubarray(self.hiddenFeedForwardStatesPrev,
                                              (x - self.lateralRadius, y - self.lateralRadius),
                                              (x + self.lateralRadius + 1, y + self.lateralRadius + 1))
 
@@ -163,7 +167,7 @@ class HTFERL_Layer(object):
 
                 self.visibleReconstruction[x][y] = np.dot(self.feedForwardWeights[index].T, subHidden) + self.visibleBiases[x][y]
 
-    def weightUpdate(self, nextVisible, alpha):
+    def learn(self, nextVisible, alpha):
         reconstructionError = nextVisible - self.visibleReconstruction
 
         for x in range(0, self.layerSize[0]):
@@ -196,7 +200,7 @@ class HTFERL_Layer(object):
 
                 self.hiddenErrors[x][y] = np.dot(self.feedForwardWeights[index].T, reconstructionError)
 
-                subFeedLateral = getSubarray(self.hiddenFeedForwardStates,
+                subFeedLateral = getSubarray(self.hiddenFeedForwardStatesPrev,
                                              (x - self.lateralRadius, y - self.lateralRadius),
                                              (x + self.lateralRadius, y + self.lateralRadius))
 
@@ -213,7 +217,10 @@ class HTFERL_Layer(object):
         # Update visible biases
         self.visibleBiases += alpha * reconstructionError
 
-
+    def stepEnd(self):
+        temp = self.hiddenFeedForwardStatesPrev
+        self.hiddenFeedForwardStatesPrev = hiddenFeedForwardStates
+        hiddenFeedForwardStates = temp
 
 
 

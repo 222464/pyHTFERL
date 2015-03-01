@@ -24,6 +24,12 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="HTFERL_Agent.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="HTFERL_Hierarchy.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="HTFERL_Layer.py">
       <SubType>Code</SubType>
     </Compile>
