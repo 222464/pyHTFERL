@@ -24,8 +24,8 @@ class HTFERL_Layer(object):
     def __init__(self,
                  inputSize = (8, 8),
                  layerSize = (8, 8),
-                 feedForwardRadius = 2, lateralRadius = 2, feedBackRadius = 2, inhibitionRadius = 2, 
-                 sparsity = 0.125,
+                 feedForwardRadius = 2, lateralRadius = 3, feedBackRadius = 3, inhibitionRadius = 2, 
+                 sparsity = 0.125, dutyCycleDecay = 0.01,
                  minInitWeight = -0.1, maxInitWeight = 0.1):
 
         self.inputSize = inputSize
@@ -37,6 +37,7 @@ class HTFERL_Layer(object):
         self.feedBackRadius = feedBackRadius
 
         self.sparsity = sparsity
+        self.dutyCycleDecay = dutyCycleDecay
 
         self.visibleStates = np.zeros(inputSize)
         self.visibleBiases = np.random.rand(inputSize[0], inputSize[1]) * (maxInitWeight - minInitWeight) + minInitWeight
@@ -113,6 +114,8 @@ class HTFERL_Layer(object):
                 else:
                     self.hiddenFeedForwardStates[x][y] = 0.0
 
+        self.hiddenDutyCycles = (1.0 - self.dutyCycleDecay) * self.hiddenDutyCycles + self.dutyCycleDecay * self.hiddenFeedForwardStates
+
     def activateFeedBack(self, nextLayerHidden):
         # Get feedback from higher layer and modify SDR with this information
         for x in range(0, self.layerSize[0]):
@@ -147,9 +150,9 @@ class HTFERL_Layer(object):
                                 numHigher += 1.0
 
                 if numHigher < localActivity:
-                    self.hiddenFeedForwardStates[x][y] = 1.0
+                    self.hiddenFeedBackStates[x][y] = 1.0
                 else:
-                    self.hiddenFeedForwardStates[x][y] = 0.0
+                    self.hiddenFeedBackStates[x][y] = 0.0
 
         # Reconstruct visible
         self.visibleReconstruction = self.visibleBiases
@@ -174,7 +177,7 @@ class HTFERL_Layer(object):
                         
                         weightIndex += 1
 
-    def learn(self, nextTimestepVisible, nextLayerHidden, alpha):
+    def learn(self, nextTimestepVisible, nextLayerHidden, alpha, beta):
         reconstructionError = nextTimestepVisible - self.visibleReconstruction
 
         for x in range(0, self.layerSize[0]):
@@ -193,14 +196,13 @@ class HTFERL_Layer(object):
                                              (vCenter[0] - self.feedForwardRadius, vCenter[1] - self.feedForwardRadius),
                                              (vCenter[0] + self.feedForwardRadius + 1, vCenter[1] + self.feedForwardRadius + 1))
 
-
-                self.hiddenErrors[x][y] = np.dot(self.feedForwardWeights[index].T, subReconstructionError) * self.hiddenActivations[x][y] * (1.0 - self.hiddenActivations[x][y])
+                self.hiddenErrors[x][y] = np.dot(self.feedForwardWeights[index], subReconstructionError) * self.hiddenActivations[x][y] * (1.0 - self.hiddenActivations[x][y])
 
                 # Update feed forward weights
                 self.feedForwardWeights[index] += alpha * 0.5 * (self.hiddenFeedBackStates[x][y] * subReconstructionError + self.hiddenErrors[x][y] * subFeedForward)
 
                 # Update hidden biases
-                self.hiddenBiases[x][y] += alpha * self.hiddenErrors[x][y]
+                self.hiddenBiases[x][y] += alpha * self.hiddenErrors[x][y] + beta * (self.sparsity - self.hiddenDutyCycles[x][y])
 
         # Update recurrent connections (lateral and feedback)
         for x in range(0, self.layerSize[0]):

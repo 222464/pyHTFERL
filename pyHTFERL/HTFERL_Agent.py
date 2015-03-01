@@ -51,7 +51,7 @@ class HTFERL_Agent(object):
     def getAction(self, position):
         return self.hierarchy.getReconstruction(position)
 
-    def step(self, reward, hAlpha, qAlpha, gamma, actionBreakChance):
+    def step(self, reward, hAlpha, hBeta, qAlpha, gamma, actionBreakChance):
         self.hierarchy.activateFeedForward()
 
         q = self.getQ()
@@ -63,7 +63,7 @@ class HTFERL_Agent(object):
         self.updatePrevQ(tdError * qAlpha)
 
         if tdError > 0.0:
-            self.hierarchy.learn(hAlpha)
+            self.hierarchy.learn(hAlpha, hBeta)
 
         self.hierarchy.stepEnd()
 

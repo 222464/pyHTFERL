@@ -7,10 +7,11 @@ class HTFERL_LayerParams(object):
     inputSize = (8, 8)
     layerSize = (8, 8)
     feedForwardRadius = 2
-    lateralRadius = 2
-    feedBackRadius = 2
+    lateralRadius = 3
+    feedBackRadius = 3
     inhibitionRadius = 2
     sparsity = 0.125
+    dutyCycleDecay = 0.01
 
 class HTFERL_Hierarchy(object):
     """A Hierachy of Layers for HTFERL"""
@@ -26,6 +27,7 @@ class HTFERL_Hierarchy(object):
                                      layerParams[l].feedBackRadius,
                                      layerParams[l].inhibitionRadius,
                                      layerParams[l].sparsity,
+                                     layerParams[l].dutyCycleDecay,
                                      minInitWeight, maxInitWeight)
 
             # Make sure input of one layer is the size of the hidden layer below it
@@ -58,12 +60,12 @@ class HTFERL_Hierarchy(object):
             else:
                 self.layers[l].activateFeedBack(self.layers[l + 1].hiddenFeedBackStates)
         
-    def learn(self, alpha):
+    def learn(self, alpha, beta):
         for l in range(0, len(self.layers)):
             if l == len(self.layers) - 1:
-                self.layers[l].learn(self.layers[l].visibleStates, np.zeros(self.layers[l].hiddenFeedBackStates.shape), alpha)
+                self.layers[l].learn(self.layers[l].visibleStates, np.zeros(self.layers[l].hiddenFeedBackStates.shape), alpha, beta)
             else:
-                self.layers[l].learn(self.layers[l].visibleStates, self.layers[l + 1].hiddenFeedBackStates, alpha)
+                self.layers[l].learn(self.layers[l].visibleStates, self.layers[l + 1].hiddenFeedBackStates, alpha, beta)
 
     def stepEnd(self):
         for l in range(0, len(self.layers)):

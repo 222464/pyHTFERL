@@ -1,11 +1,11 @@
 import HTFERL_Hierarchy as hth
 
-layerParams = [hth.HTFERL_LayerParams() for i in range(0, 2)]
+layerParams = [hth.HTFERL_LayerParams() for i in range(0, 1)]
 
 layerParams[0].inputSize = (6, 6)
 layerParams[0].layerSize = (6, 6)
-layerParams[1].inputSize = (6, 6)
-layerParams[1].layerSize = (4, 4)
+#layerParams[1].inputSize = (6, 6)
+#layerParams[1].layerSize = (4, 4)
 
 hierarchy = hth.HTFERL_Hierarchy(layerParams, -0.1, 0.1)
 
@@ -29,7 +29,7 @@ for i in range(0, 1000):
 
         hierarchy.activateFeedForward()
 
-        hierarchy.learn(0.05)
+        hierarchy.learn(0.005, 0.1)
 
         hierarchy.activateFeedBack()
 
