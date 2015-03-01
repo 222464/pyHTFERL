@@ -1,4 +1,5 @@
 import numpy as np
+from copy import deepcopy
 
 def getSubarray(matrix, lowerBound, upperBound):
     size = (upperBound[0] - lowerBound[0]) * (upperBound[1] - lowerBound[1])
@@ -40,14 +41,19 @@ class HTFERL_Layer(object):
         self.dutyCycleDecay = dutyCycleDecay
 
         self.visibleStates = np.zeros(inputSize)
+        self.visibleStatesPrev = np.zeros(inputSize)
         self.visibleBiases = np.random.rand(inputSize[0], inputSize[1]) * (maxInitWeight - minInitWeight) + minInitWeight
         self.visibleReconstruction = np.zeros(inputSize)
+        self.visibleReconstructionPrev = np.zeros(inputSize)
 
         self.hiddenSums = np.zeros(layerSize)
         self.hiddenActivations = np.zeros(layerSize)
+        self.hiddenActivationsPrev = np.zeros(layerSize)
         self.hiddenFeedForwardStates = np.zeros(layerSize)
         self.hiddenFeedForwardStatesPrev = np.zeros(layerSize)
         self.hiddenFeedBackStates = np.zeros(layerSize)
+        self.hiddenFeedBackStatesPrev = np.zeros(layerSize)
+        self.hiddenFeedBackStatesPrevPrev = np.zeros(layerSize)
         self.hiddenBiases = np.random.rand(layerSize[0], layerSize[1]) * (maxInitWeight - minInitWeight) + minInitWeight
         self.hiddenDutyCycles = np.full(layerSize, sparsity)
         self.hiddenErrors = np.zeros(layerSize)
@@ -85,7 +91,7 @@ class HTFERL_Layer(object):
                                              (vCenter[0] + self.feedForwardRadius + 1, vCenter[1] + self.feedForwardRadius + 1))
 
                 # TODO: Decide whether to move this to feedback phase instead?
-                subFeedLateral = getSubarray(self.hiddenFeedForwardStatesPrev,
+                subFeedLateral = getSubarray(self.hiddenFeedBackStatesPrev,
                                              (x - self.lateralRadius, y - self.lateralRadius),
                                              (x + self.lateralRadius + 1, y + self.lateralRadius + 1))
 
@@ -155,7 +161,9 @@ class HTFERL_Layer(object):
                     self.hiddenFeedBackStates[x][y] = 0.0
 
         # Reconstruct visible
-        self.visibleReconstruction = self.visibleBiases
+        self.visibleReconstruction = deepcopy(self.visibleBiases)
+
+        feedForwardSize = 2 * self.feedForwardRadius + 1
 
         for x in range(0, self.layerSize[0]):
             for y in range(0, self.layerSize[1]):
@@ -164,12 +172,10 @@ class HTFERL_Layer(object):
                 # Center of visible receptive field
                 vCenter = (int(x / (self.layerSize[0] - 1) * (self.inputSize[0] - 1)), int(y / (self.layerSize[1] - 1) * (self.inputSize[1] - 1)))
 
-                feedForwardSize = 2 * self.feedForwardRadius + 1
-
                 weightIndex = 0
 
-                for rx in range(-self.feedForwardRadius, self.feedForwardRadius + 1):
-                    for ry in range(-self.feedForwardRadius, self.feedForwardRadius + 1):
+                for ry in range(-self.feedForwardRadius, self.feedForwardRadius + 1):
+                    for rx in range(-self.feedForwardRadius, self.feedForwardRadius + 1):
                         visiblePosition = (x + rx, y + ry)
 
                         if visiblePosition[0] >= 0 and visiblePosition[1] >= 0 and visiblePosition[0] < self.inputSize[0] and visiblePosition[1] < self.inputSize[1]:
@@ -177,8 +183,10 @@ class HTFERL_Layer(object):
                         
                         weightIndex += 1
 
-    def learn(self, nextTimestepVisible, nextLayerHidden, alpha, beta):
-        reconstructionError = nextTimestepVisible - self.visibleReconstruction
+        self.hiddenDutyCycles = (1.0 - self.dutyCycleDecay) * self.hiddenDutyCycles + self.dutyCycleDecay * self.hiddenFeedBackStates
+
+    def learn(self, nextLayerHiddenPrev, alpha, beta):
+        reconstructionError = self.visibleStates - self.visibleReconstructionPrev
 
         for x in range(0, self.layerSize[0]):
             for y in range(0, self.layerSize[1]):
@@ -192,14 +200,14 @@ class HTFERL_Layer(object):
                                                      (vCenter[0] - self.feedForwardRadius, vCenter[1] - self.feedForwardRadius),
                                                      (vCenter[0] + self.feedForwardRadius + 1, vCenter[1] + self.feedForwardRadius + 1))
 
-                subFeedForward = getSubarray(self.visibleStates,
+                subFeedForward = getSubarray(self.visibleStatesPrev,
                                              (vCenter[0] - self.feedForwardRadius, vCenter[1] - self.feedForwardRadius),
                                              (vCenter[0] + self.feedForwardRadius + 1, vCenter[1] + self.feedForwardRadius + 1))
 
-                self.hiddenErrors[x][y] = np.dot(self.feedForwardWeights[index], subReconstructionError) * self.hiddenActivations[x][y] * (1.0 - self.hiddenActivations[x][y])
+                self.hiddenErrors[x][y] = np.dot(self.feedForwardWeights[index], subReconstructionError) * self.hiddenActivationsPrev[x][y] * (1.0 - self.hiddenActivationsPrev[x][y])
 
                 # Update feed forward weights
-                self.feedForwardWeights[index] += alpha * 0.5 * (self.hiddenFeedBackStates[x][y] * subReconstructionError + self.hiddenErrors[x][y] * subFeedForward)
+                self.feedForwardWeights[index] += alpha * 0.5 * (self.hiddenFeedBackStatesPrev[x][y] * subReconstructionError + self.hiddenErrors[x][y] * subFeedForward)
 
                 # Update hidden biases
                 self.hiddenBiases[x][y] += alpha * self.hiddenErrors[x][y] + beta * (self.sparsity - self.hiddenDutyCycles[x][y])
@@ -210,13 +218,13 @@ class HTFERL_Layer(object):
                 index = x + y * self.layerSize[0]
 
                 # Center of next layer field
-                nCenter = (int(x / (self.layerSize[0] - 1) * (nextLayerHidden.shape[0] - 1)), int(y / (self.layerSize[1] - 1) * (nextLayerHidden.shape[1] - 1)))
+                nCenter = (int(x / (self.layerSize[0] - 1) * (nextLayerHiddenPrev.shape[0] - 1)), int(y / (self.layerSize[1] - 1) * (nextLayerHiddenPrev.shape[1] - 1)))
 
-                subFeedLateral = getSubarray(self.hiddenFeedForwardStatesPrev,
+                subFeedLateral = getSubarray(self.hiddenFeedBackStatesPrevPrev,
                                              (x - self.lateralRadius, y - self.lateralRadius),
                                              (x + self.lateralRadius + 1, y + self.lateralRadius + 1))
 
-                subFeedBack = getSubarray(nextLayerHidden,
+                subFeedBack = getSubarray(nextLayerHiddenPrev,
                                           (nCenter[0] - self.lateralRadius, nCenter[1] - self.lateralRadius),
                                           (nCenter[0] + self.lateralRadius + 1, nCenter[1] + self.lateralRadius + 1))
 
@@ -233,6 +241,23 @@ class HTFERL_Layer(object):
         temp = self.hiddenFeedForwardStatesPrev
         self.hiddenFeedForwardStatesPrev = self.hiddenFeedForwardStates
         self.hiddenFeedForwardStates = temp
+
+        temp = self.hiddenFeedBackStatesPrevPrev
+        self.hiddenFeedBackStatesPrevPrev = self.hiddenFeedBackStatesPrev
+        self.hiddenFeedBackStatesPrev = self.hiddenFeedBackStates
+        self.hiddenFeedBackStates = temp
+
+        temp = self.hiddenActivationsPrev
+        self.hiddenActivationsPrev = self.hiddenActivations
+        self.hiddenActivations = temp
+
+        temp = self.visibleStatesPrev
+        self.visibleStatesPrev = self.visibleStates
+        self.visibleStates = temp
+
+        temp = self.visibleReconstructionPrev
+        self.visibleReconstructionPrev = self.visibleReconstruction
+        self.visibleReconstruction = temp
 
 
 

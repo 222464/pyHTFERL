@@ -29,9 +29,9 @@ for i in range(0, 1000):
 
         hierarchy.activateFeedForward()
 
-        hierarchy.learn(0.005, 0.1)
-
         hierarchy.activateFeedBack()
+
+        hierarchy.learn(0.01, 0.01)
 
         print(str(hierarchy.getReconstruction((1, 1))) + " ")
         print(str(hierarchy.getReconstruction((2, 1))) + " ")

@@ -63,9 +63,9 @@ class HTFERL_Hierarchy(object):
     def learn(self, alpha, beta):
         for l in range(0, len(self.layers)):
             if l == len(self.layers) - 1:
-                self.layers[l].learn(self.layers[l].visibleStates, np.zeros(self.layers[l].hiddenFeedBackStates.shape), alpha, beta)
+                self.layers[l].learn(np.zeros(self.layers[l].hiddenFeedBackStatesPrev.shape), alpha, beta)
             else:
-                self.layers[l].learn(self.layers[l].visibleStates, self.layers[l + 1].hiddenFeedBackStates, alpha, beta)
+                self.layers[l].learn(self.layers[l + 1].hiddenFeedBackStatesPrev, alpha, beta)
 
     def stepEnd(self):
         for l in range(0, len(self.layers)):
